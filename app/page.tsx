@@ -1,113 +1,269 @@
-import Image from "next/image";
+"use client"; // Ensures the component is treated as a client component
+import { useEffect, useState } from "react";
+import axios from "axios";
+import { Employee as EmployeeType } from "./employee";
+import './global.css';
+type SortByType = "firstName" | "lastName" | "position";
 
 export default function Home() {
+  const [employees, setEmployees] = useState<EmployeeType[]>([]);
+  const [newEmployee, setNewEmployee] = useState<EmployeeType>({
+    _id: "",
+    firstName: "",
+    lastName: "",
+    position: "",
+    phone: "",
+    email: "",
+  });
+
+  const [editedEmployees, setEditedEmployees] = useState<EmployeeType[]>([]);
+  const [showAddEmployeeForm, setShowAddEmployeeForm] = useState(false);
+  const [sortBy, setSortBy] = useState<SortByType>("firstName");
+  const [sortOrder, setSortOrder] = useState("asc");
+
+  const sortEmployees = () => {
+    const sortedEmployees = [...employees];
+    sortedEmployees.sort((a, b) => {
+      if (sortOrder === "asc") {
+        return a[sortBy].localeCompare(b[sortBy]);
+      } else {
+        return b[sortBy].localeCompare(a[sortBy]);
+      }
+    });
+    setEmployees(sortedEmployees);
+  };
+
+  useEffect(() => {
+    sortEmployees();
+  }, [sortBy, sortOrder]);
+
+  const fetchEmployees = async () => {
+    const res = await axios.get("/api");
+    setEmployees(res.data.employees);
+  };
+
+  useEffect(() => {
+    fetchEmployees();
+  }, []);
+
+  const validateEmail = (email: string) => {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    return emailRegex.test(email);
+  };
+
+  const isDuplicateEmail = (email: string, excludeId: string = "") => {
+    return employees.some(emp => emp.email === email && emp._id !== excludeId);
+  };
+
+  const handleInputChange = (
+    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>,
+    employee: EmployeeType
+  ) => {
+    const { name, value } = e.target;
+    const updatedEmployees = employees.map((emp) =>
+      emp._id === employee._id ? { ...emp, [name]: value } : emp
+    );
+    setEmployees(updatedEmployees);
+
+    const updatedEmployee = { ...employee, [name]: value };
+    const index = editedEmployees.findIndex((emp) => emp._id === employee._id);
+
+    if (index !== -1) {
+      setEditedEmployees(editedEmployees.map((emp, i) => (i === index ? updatedEmployee : emp)));
+    } else {
+      setEditedEmployees([...editedEmployees, updatedEmployee]);
+    }
+  };
+
+  const handleAddEmployee = async () => {
+    if (
+      !newEmployee.firstName ||
+      !newEmployee.lastName ||
+      !newEmployee.position ||
+      !newEmployee.phone ||
+      !newEmployee.email
+    ) {
+      alert("Please fill all fields before adding.");
+      return;
+    }
+
+    if (!validateEmail(newEmployee.email)) {
+      alert("Please enter a valid email address.");
+      return;
+    }
+
+    if (isDuplicateEmail(newEmployee.email)) {
+      alert("Email is already in use.");
+      return;
+    }
+
+    await axios.post("/api", [newEmployee]);
+    fetchEmployees();
+    setNewEmployee({
+      _id: "",
+      firstName: "",
+      lastName: "",
+      position: "",
+      phone: "",
+      email: "",
+    });
+    setShowAddEmployeeForm(false);
+  };
+
+  const handleSaveChanges = async () => {
+    for (let emp of editedEmployees) {
+      if (!validateEmail(emp.email)) {
+        alert(`Invalid email format for ${emp.firstName} ${emp.lastName}.`);
+        return;
+      }
+      if (isDuplicateEmail(emp.email, emp._id)) {
+        alert(`Duplicate email found for ${emp.firstName} ${emp.lastName}.`);
+        return;
+      }
+    }
+
+    await axios.put("/api", editedEmployees);
+    setEditedEmployees([]);
+    fetchEmployees();
+  };
+
   return (
-    <main className="flex min-h-screen flex-col items-center justify-between p-24">
-      <div className="z-10 w-full max-w-5xl items-center justify-between font-mono text-sm lg:flex">
-        <p className="fixed left-0 top-0 flex w-full justify-center border-b border-gray-300 bg-gradient-to-b from-zinc-200 pb-6 pt-8 backdrop-blur-2xl dark:border-neutral-800 dark:bg-zinc-800/30 dark:from-inherit lg:static lg:w-auto  lg:rounded-xl lg:border lg:bg-gray-200 lg:p-4 lg:dark:bg-zinc-800/30">
-          Get started by editing&nbsp;
-          <code className="font-mono font-bold">app/page.tsx</code>
-        </p>
-        <div className="fixed bottom-0 left-0 flex h-48 w-full items-end justify-center bg-gradient-to-t from-white via-white dark:from-black dark:via-black lg:static lg:size-auto lg:bg-none">
-          <a
-            className="pointer-events-none flex place-items-center gap-2 p-8 lg:pointer-events-auto lg:p-0"
-            href="https://vercel.com?utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            By{" "}
-            <Image
-              src="/vercel.svg"
-              alt="Vercel Logo"
-              className="dark:invert"
-              width={100}
-              height={24}
-              priority
-            />
-          </a>
+    <div>
+      <h1>Employees</h1>
+      <button onClick={handleSaveChanges}>Save Changes</button>
+      <button onClick={() => setShowAddEmployeeForm(!showAddEmployeeForm)}>
+        {showAddEmployeeForm ? "Cancel" : "Add Employee"}
+      </button>
+      {showAddEmployeeForm && (
+        <div>
+          <h2>Add New Employee</h2>
+          <table>
+            <td>
+              <input
+                type="text"
+                placeholder="First Name"
+                value={newEmployee.firstName}
+                onChange={(e) =>
+                  setNewEmployee({ ...newEmployee, firstName: e.target.value })
+                }
+              />
+
+            </td>
+            <td>
+              <input
+                type="text"
+                placeholder="Last Name"
+                value={newEmployee.lastName}
+                onChange={(e) =>
+                  setNewEmployee({ ...newEmployee, lastName: e.target.value })
+                }
+              />
+            </td>
+            <td>
+              <input
+                type="text"
+                placeholder="Position"
+                value={newEmployee.position}
+                onChange={(e) =>
+                  setNewEmployee({ ...newEmployee, position: e.target.value })
+                }
+              />
+            </td>
+            <td>
+              <input
+                type="text"
+                placeholder="Phone"
+                value={newEmployee.phone}
+                onChange={(e) => setNewEmployee({ ...newEmployee, phone: e.target.value })}
+              />
+            </td>
+            <td>
+              <input
+                type="text"
+                placeholder="Email"
+                value={newEmployee.email}
+                onChange={(e) => setNewEmployee({ ...newEmployee, email: e.target.value })}
+              />
+            </td>
+            <td>
+
+              <button onClick={handleAddEmployee}>Add Employee</button>
+            </td>
+          </table>
         </div>
-      </div>
-
-      <div className="relative z-[-1] flex place-items-center before:absolute before:h-[300px] before:w-full before:-translate-x-1/2 before:rounded-full before:bg-gradient-radial before:from-white before:to-transparent before:blur-2xl before:content-[''] after:absolute after:-z-20 after:h-[180px] after:w-full after:translate-x-1/3 after:bg-gradient-conic after:from-sky-200 after:via-blue-200 after:blur-2xl after:content-[''] before:dark:bg-gradient-to-br before:dark:from-transparent before:dark:to-blue-700 before:dark:opacity-10 after:dark:from-sky-900 after:dark:via-[#0141ff] after:dark:opacity-40 sm:before:w-[480px] sm:after:w-[240px] before:lg:h-[360px]">
-        <Image
-          className="relative dark:drop-shadow-[0_0_0.3rem_#ffffff70] dark:invert"
-          src="/next.svg"
-          alt="Next.js Logo"
-          width={180}
-          height={37}
-          priority
-        />
-      </div>
-
-      <div className="mb-32 grid text-center lg:mb-0 lg:w-full lg:max-w-5xl lg:grid-cols-4 lg:text-left">
-        <a
-          href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-          className="group rounded-lg border border-transparent px-5 py-4 transition-colors hover:border-gray-300 hover:bg-gray-100 hover:dark:border-neutral-700 hover:dark:bg-neutral-800/30"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <h2 className="mb-3 text-2xl font-semibold">
-            Docs{" "}
-            <span className="inline-block transition-transform group-hover:translate-x-1 motion-reduce:transform-none">
-              -&gt;
-            </span>
-          </h2>
-          <p className="m-0 max-w-[30ch] text-sm opacity-50">
-            Find in-depth information about Next.js features and API.
-          </p>
-        </a>
-
-        <a
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          className="group rounded-lg border border-transparent px-5 py-4 transition-colors hover:border-gray-300 hover:bg-gray-100 hover:dark:border-neutral-700 hover:dark:bg-neutral-800/30"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <h2 className="mb-3 text-2xl font-semibold">
-            Learn{" "}
-            <span className="inline-block transition-transform group-hover:translate-x-1 motion-reduce:transform-none">
-              -&gt;
-            </span>
-          </h2>
-          <p className="m-0 max-w-[30ch] text-sm opacity-50">
-            Learn about Next.js in an interactive course with&nbsp;quizzes!
-          </p>
-        </a>
-
-        <a
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-          className="group rounded-lg border border-transparent px-5 py-4 transition-colors hover:border-gray-300 hover:bg-gray-100 hover:dark:border-neutral-700 hover:dark:bg-neutral-800/30"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <h2 className="mb-3 text-2xl font-semibold">
-            Templates{" "}
-            <span className="inline-block transition-transform group-hover:translate-x-1 motion-reduce:transform-none">
-              -&gt;
-            </span>
-          </h2>
-          <p className="m-0 max-w-[30ch] text-sm opacity-50">
-            Explore starter templates for Next.js.
-          </p>
-        </a>
-
-        <a
-          href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-          className="group rounded-lg border border-transparent px-5 py-4 transition-colors hover:border-gray-300 hover:bg-gray-100 hover:dark:border-neutral-700 hover:dark:bg-neutral-800/30"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <h2 className="mb-3 text-2xl font-semibold">
-            Deploy{" "}
-            <span className="inline-block transition-transform group-hover:translate-x-1 motion-reduce:transform-none">
-              -&gt;
-            </span>
-          </h2>
-          <p className="m-0 max-w-[30ch] text-balance text-sm opacity-50">
-            Instantly deploy your Next.js site to a shareable URL with Vercel.
-          </p>
-        </a>
-      </div>
-    </main>
+      )}
+      <table>
+        <thead>
+          <tr>
+            <th>
+              First Name
+              <button onClick={() => setSortBy("firstName")}>
+                {sortBy === "firstName" ? "▲" : "▼"}
+              </button>
+            </th>
+            <th>
+              Last Name
+              <button onClick={() => setSortBy("lastName")}>
+                {sortBy === "lastName" ? "▲" : "▼"}
+              </button>
+            </th>
+            <th>
+              Position
+              <button onClick={() => setSortBy("position")}>
+                {sortBy === "position" ? "▲" : "▼"}
+              </button>
+            </th>
+            <th>Phone</th>
+            <th>Email</th>
+          </tr>
+        </thead>
+        <tbody>
+          {employees.map((employee) => (
+            <tr key={employee._id}>
+              <td>
+                <input
+                  type="text"
+                  name="firstName"
+                  value={employee.firstName}
+                  onChange={(e) => handleInputChange(e, employee)}
+                />
+              </td>
+              <td>
+                <input
+                  type="text"
+                  name="lastName"
+                  value={employee.lastName}
+                  onChange={(e) => handleInputChange(e, employee)}
+                />
+              </td>
+              <td>
+                <input
+                  type="text"
+                  name="position"
+                  value={employee.position}
+                  onChange={(e) => handleInputChange(e, employee)}
+                />
+              </td>
+              <td>
+                <input
+                  type="text"
+                  name="phone"
+                  value={employee.phone}
+                  onChange={(e) => handleInputChange(e, employee)}
+                />
+              </td>
+              <td>
+                <input
+                  type="text"
+                  name="email"
+                  value={employee.email}
+                  onChange={(e) => handleInputChange(e, employee)}
+                />
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
   );
 }

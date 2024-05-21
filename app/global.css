@@ -1,0 +1,35 @@
+h1 {
+  font: 2em sans-serif;
+}
+
+input {
+  background-color: #fafafa;
+  border: none;
+  padding: 5px;
+  width: 100%;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  font: 1em sans-serif;
+}
+
+th {
+  background-color: #f2f2f2;
+  text-align: left;
+  padding: 10px;
+  cursor: pointer;
+}
+
+td {
+  padding: 10px;
+  border-bottom: 1px solid #ddd;
+}
+
+th button {
+  background: none;
+  border: none;
+  cursor: pointer;
+  margin-left: 5px;
+}
